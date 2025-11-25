@@ -52,137 +52,138 @@
 </div>
 
     </div>
+<script>
+    const $ = (sel) => document.querySelector(sel);
+const chatContainer = $('#chatContainer');
+const messageInput = $('#messageInput');
+const sendBtn = $('#sendBtn');
+const newChatBtn = $('#newChatBtn');
+const chatHistory = $('#chatHistory');
+const emptyState = $('#emptyState');
 
-    <script>
-        const $ = (sel) => document.querySelector(sel);
-        const chatContainer = $('#chatContainer');
-        const messageInput = $('#messageInput');
-        const sendBtn = $('#sendBtn');
-        const newChatBtn = $('#newChatBtn');
-        const chatHistory = $('#chatHistory');
-        const emptyState = $('#emptyState');
+let loading = false;
 
-        let loading = false;
+function renderMessage(text, role) {
+    if (emptyState) {
+        const el = emptyState;
+        if (el.parentNode) el.remove();
+    }
+    const wrapper = document.createElement('div');
+    wrapper.className = `message ${role}-message`;
 
-        function renderMessage(text, role) {
-            if (emptyState) {
-                const el = emptyState;
-                if (el.parentNode) el.remove();
-            }
-            const wrapper = document.createElement('div');
-            wrapper.className = `message ${role}-message`;
+    const avatar = document.createElement('div');
+    avatar.className = `message-avatar ${role}-avatar`;
+    avatar.textContent = role === 'user' ? 'You' : '🤖';
 
-            const avatar = document.createElement('div');
-            avatar.className = `message-avatar ${role}-avatar`;
-            avatar.textContent = role === 'user' ? 'You' : '🤖';
+    const content = document.createElement('div');
+    content.className = `message-content ${role}-content`;
+    content.textContent = text;
 
-            const content = document.createElement('div');
-            content.className = `message-content ${role}-content`;
-            content.textContent = text;
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(content);
+    chatContainer.appendChild(wrapper);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
 
-            wrapper.appendChild(avatar);
-            wrapper.appendChild(content);
-            chatContainer.appendChild(wrapper);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
+function setLoading(on) {
+    loading = on;
+    sendBtn.disabled = on;
+    if (on) showLoader(); else removeLoader();
+}
 
-        function setLoading(on) {
-            loading = on;
-            sendBtn.disabled = on;
-            if (on) showLoader(); else removeLoader();
-        }
+function showLoader() {
+    if ($('#loadingIndicator')) return;
+    const loader = document.createElement('div');
+    loader.className = 'message';
+    loader.id = 'loadingIndicator';
 
-        function showLoader() {
-            if ($('#loadingIndicator')) return;
-            const loader = document.createElement('div');
-            loader.className = 'message';
-            loader.id = 'loadingIndicator';
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar assistant-avatar';
+    avatar.textContent = '🤖';
 
-            const avatar = document.createElement('div');
-            avatar.className = 'message-avatar assistant-avatar';
-            avatar.textContent = '🤖';
+    const content = document.createElement('div');
+    content.className = 'message-content assistant-content loading';
+    content.innerHTML = '<span></span><span></span><span></span>';
 
-            const content = document.createElement('div');
-            content.className = 'message-content assistant-content loading';
-            content.innerHTML = '<span></span><span></span><span></span>';
+    loader.appendChild(avatar);
+    loader.appendChild(content);
+    chatContainer.appendChild(loader);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
 
-            loader.appendChild(avatar);
-            loader.appendChild(content);
-            chatContainer.appendChild(loader);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
+function removeLoader() {
+    const el = $('#loadingIndicator');
+    if (el) el.remove();
+}
 
-        function removeLoader() {
-            const el = $('#loadingIndicator');
-            if (el) el.remove();
-        }
+async function sendMessage() {
+    const text = messageInput.value.trim();
+    if (!text || loading) return;
 
-        async function sendMessage() {
-            const text = messageInput.value.trim();
-            if (!text || loading) return;
+    messageInput.value = '';
+    renderMessage(text, 'user');
+    setLoading(true);
 
-            messageInput.value = '';
-            renderMessage(text, 'user');
-            setLoading(true);
-
-            try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
-                });
-                const data = await res.json().catch(() => ({ error: 'Invalid JSON' }));
-                if (res.ok && data.success) {
-                    renderMessage(data.message, 'assistant');
-                    addHistoryPreview(data.message);
-                } else {
-                    renderMessage(`Error: ${data.error || 'Unknown error'}`, 'assistant');
-                }
-            } catch (err) {
-                renderMessage(`Network error: ${err.message}`, 'assistant');
-            } finally {
-                setLoading(false);
-                messageInput.focus();
-            }
-        }
-
-        async function newChat() {
-            try {
-                await fetch('/api/clear', { method: 'POST' });
-                chatContainer.innerHTML = `
-                    <div class="empty-state" id="emptyState">
-                        <div class="empty-icon">💬</div>
-                        <p>Start a conversation with the AI</p>
-                    </div>
-                `;
-                chatHistory.innerHTML = '';
-                messageInput.value = '';
-                messageInput.focus();
-            } catch (err) {
-                renderMessage(`Network error: ${err.message}`, 'assistant');
-            }
-        }
-
-        function addHistoryPreview(text) {
-            const item = document.createElement('div');
-            item.className = 'history-item';
-            item.textContent = text.length > 60 ? text.slice(0, 57) + '...' : text;
-            item.onclick = () => messageInput.focus();
-            chatHistory.prepend(item);
-        }
-
-        // Events
-        sendBtn.addEventListener('click', sendMessage);
-        newChatBtn.addEventListener('click', newChat);
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
+    try {
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text })
         });
-
-        // initial focus
+        const data = await res.json().catch(() => ({ error: 'Invalid JSON' }));
+        if (res.ok && data.success) {
+            renderMessage(data.message, 'assistant');
+            addHistoryPreview(data.message);
+        } else {
+            renderMessage(`Error: ${data.error || 'Unknown error'}`, 'assistant');
+        }
+    } catch (err) {
+        renderMessage(`Network error: ${err.message}`, 'assistant');
+    } finally {
+        setLoading(false);
         messageInput.focus();
-    </script>
+    }
+}
+
+async function newChat() {
+    try {
+        await fetch('/api/clear', { method: 'POST' });
+        chatContainer.innerHTML = `
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">💬</div>
+                <p>Start a conversation with the AI</p>
+            </div>
+        `;
+        chatHistory.innerHTML = '';
+        messageInput.value = '';
+        messageInput.focus();
+    } catch (err) {
+        renderMessage(`Network error: ${err.message}`, 'assistant');
+    }
+}
+
+function addHistoryPreview(text) {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.textContent = text.length > 60 ? text.slice(0, 57) + '...' : text;
+    item.onclick = () => messageInput.focus();
+    chatHistory.prepend(item);
+}
+
+// Events
+sendBtn.addEventListener('click', sendMessage);
+newChatBtn.addEventListener('click', newChat);
+messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+// initial focus
+messageInput.focus();
+
+</script>
+
 </body>
 </html>
