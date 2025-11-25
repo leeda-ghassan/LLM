@@ -1,52 +1,71 @@
 from flask import Flask, render_template, request, jsonify
 import os
+import requests
 
 app = Flask(__name__)
 
-# Simple conversation history
+# Conversation history
 messages = []
 
-# LLM Configuration (for AI)
-LLM_API_KEY = os.getenv('LLM_API_KEY', '')
-LLM_MODEL = os.getenv('LLM_MODEL', 'gpt-3.5-turbo')  # Change this to your LLM
-USE_LLM = os.getenv('USE_LLM', 'False') == 'True'  # Set to True when ready
+# LLM Configuration
+LLM_MODEL = "qwen2.5"   # MUST match installed model name
+OLLAMA_URL = "http://ollama:11434"   # Use Docker service name
 
-@app.route('/')
+
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/api/chat', methods=['POST'])
+
+@app.route("/api/chat", methods=["POST"])
 def chat():
-    user_msg = request.json.get('message', '')
+    user_msg = request.json.get("message", "").strip()
+    if not user_msg:
+        return jsonify({"error": "Empty message"}), 400
+
+    messages.append({"role": "user", "content": user_msg})
     
-    if not user_msg.strip():
-        return jsonify({'error': 'Empty message'}), 400
-    
-    # Add user message
-    messages.append({'role': 'user', 'content': user_msg})
-    
-    # Get response from LLM
-    if USE_LLM and LLM_API_KEY:
-        response = get_llm_response(user_msg)
-    else:
-        response = "Waiting for LLM integration..."
-    
-    # Add AI response
-    messages.append({'role': 'assistant', 'content': response})
-    
-    return jsonify({'success': True, 'message': response})
+    response = get_llm_response(user_msg)
+
+    messages.append({"role": "assistant", "content": response})
+    return jsonify({"success": True, "message": response})
+
 
 def get_llm_response(user_input):
     """
-    LLM integration logic goes here.
+    Sends user input to Ollama using /api/chat (non-streaming).
     """
-    return "LLM not configured yet. Please implement the get_llm_response() function." # Placeholder response
+    try:
+        payload = {
+            "model": LLM_MODEL,
+            "messages": [
+                {"role": "user", "content": user_input}
+            ],
+            "stream": False  # IMPORTANT: disables streaming
+        }
 
-@app.route('/api/clear', methods=['POST'])
+        res = requests.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=30)
+        res.raise_for_status()
+
+        data = res.json()
+
+        # Extract assistant reply
+        return data["message"]["content"]
+
+    except Exception as e:
+        return f"Error connecting to Ollama: {e}"
+
+
+    except Exception as e:
+        return f"Error connecting to Ollama: {e}"
+
+
+@app.route("/api/clear", methods=["POST"])
 def clear():
     global messages
     messages = []
-    return jsonify({'success': True})
+    return jsonify({"success": True})
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5001)

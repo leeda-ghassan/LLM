@@ -36,8 +36,8 @@
 
         <!-- Model selector -->
         <select id="modelSelect" class="model-select">
-            <option value="qwen">qwen</option>
-            <option value="ollama">ollama</option>
+            <option value="qwen2.5">qwen</option>
+            <option value="llama3">ollama</option>
         </select>
 
         <input
@@ -131,7 +131,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 });
-                const data = await res.json().catch(() => ({ error: 'Invalid JSON' }));
+                const data = await res.json().catch((e) => ({ error: 'Invalid JSON'+e }));
                 if (res.ok && data.success) {
                     renderMessage(data.message, 'assistant');
                     addHistoryPreview(data.message);
