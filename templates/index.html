@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="../static/style.css">
+    <title>AI Chat</title>
+    <style>
+ 
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">✨</div>
+            <span>AI Chat</span>
+        </div>
+
+        <button class="new-chat-btn" id="newChatBtn">+ New Chat</button>
+
+        <div class="chat-history" id="chatHistory" aria-live="polite"></div>
+    </div>
+
+    <div class="main-container">
+        <div class="header"><h1>AI Assistant</h1></div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">💬</div>
+                <p>Start a conversation with the AI</p>
+            </div>
+        </div>
+
+        <div class="input-area">
+    <div class="input-wrapper">
+
+        <!-- Model selector -->
+        <select id="modelSelect" class="model-select">
+            <option value="qwen">qwen</option>
+            <option value="ollama">ollama</option>
+        </select>
+
+        <input
+            id="messageInput"
+            class="message-input"
+            type="text"
+            placeholder="Message AI..."
+            aria-label="Message AI"
+        />
+        <button id="sendBtn" class="send-btn" aria-label="Send message">→</button>
+    </div>
+</div>
+
+    </div>
+
+    <script>
+        const $ = (sel) => document.querySelector(sel);
+        const chatContainer = $('#chatContainer');
+        const messageInput = $('#messageInput');
+        const sendBtn = $('#sendBtn');
+        const newChatBtn = $('#newChatBtn');
+        const chatHistory = $('#chatHistory');
+        const emptyState = $('#emptyState');
+
+        let loading = false;
+
+        function renderMessage(text, role) {
+            if (emptyState) {
+                const el = emptyState;
+                if (el.parentNode) el.remove();
+            }
+            const wrapper = document.createElement('div');
+            wrapper.className = `message ${role}-message`;
+
+            const avatar = document.createElement('div');
+            avatar.className = `message-avatar ${role}-avatar`;
+            avatar.textContent = role === 'user' ? 'You' : '🤖';
+
+            const content = document.createElement('div');
+            content.className = `message-content ${role}-content`;
+            content.textContent = text;
+
+            wrapper.appendChild(avatar);
+            wrapper.appendChild(content);
+            chatContainer.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function setLoading(on) {
+            loading = on;
+            sendBtn.disabled = on;
+            if (on) showLoader(); else removeLoader();
+        }
+
+        function showLoader() {
+            if ($('#loadingIndicator')) return;
+            const loader = document.createElement('div');
+            loader.className = 'message';
+            loader.id = 'loadingIndicator';
+
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar assistant-avatar';
+            avatar.textContent = '🤖';
+
+            const content = document.createElement('div');
+            content.className = 'message-content assistant-content loading';
+            content.innerHTML = '<span></span><span></span><span></span>';
+
+            loader.appendChild(avatar);
+            loader.appendChild(content);
+            chatContainer.appendChild(loader);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function removeLoader() {
+            const el = $('#loadingIndicator');
+            if (el) el.remove();
+        }
+
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || loading) return;
+
+            messageInput.value = '';
+            renderMessage(text, 'user');
+            setLoading(true);
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json().catch(() => ({ error: 'Invalid JSON' }));
+                if (res.ok && data.success) {
+                    renderMessage(data.message, 'assistant');
+                    addHistoryPreview(data.message);
+                } else {
+                    renderMessage(`Error: ${data.error || 'Unknown error'}`, 'assistant');
+                }
+            } catch (err) {
+                renderMessage(`Network error: ${err.message}`, 'assistant');
+            } finally {
+                setLoading(false);
+                messageInput.focus();
+            }
+        }
+
+        async function newChat() {
+            try {
+                await fetch('/api/clear', { method: 'POST' });
+                chatContainer.innerHTML = `
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-icon">💬</div>
+                        <p>Start a conversation with the AI</p>
+                    </div>
+                `;
+                chatHistory.innerHTML = '';
+                messageInput.value = '';
+                messageInput.focus();
+            } catch (err) {
+                renderMessage(`Network error: ${err.message}`, 'assistant');
+            }
+        }
+
+        function addHistoryPreview(text) {
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.textContent = text.length > 60 ? text.slice(0, 57) + '...' : text;
+            item.onclick = () => messageInput.focus();
+            chatHistory.prepend(item);
+        }
+
+        // Events
+        sendBtn.addEventListener('click', sendMessage);
+        newChatBtn.addEventListener('click', newChat);
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // initial focus
+        messageInput.focus();
+    </script>
+</body>
+</html>
