@@ -1,0 +1,24 @@
+services:
+  flask_app:
+    build: .
+    container_name: flask_app
+    ports:
+      - "5000:5000"  # Flask UI port
+    environment:
+      USE_LLM: "True"           # Enable LLM integration
+      LLM_MODEL: "qwen"         # Default model to use
+      LLM_API_KEY: ""            # Optional, leave empty if not needed
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"  # Ollama API port
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
